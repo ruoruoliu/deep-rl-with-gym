@@ -5,11 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "gymnasium[classic-control]>=1.2.3",
+    "gymnasium[accept-rom-license,atari,classic-control]>=1.2.3",
     "imageio>=2.37.2",
     "matplotlib>=3.10.8",
     "moviepy>=2.2.1",
     "pygame>=2.6.1",
     "pyvirtualdisplay>=3.0",
+    "rl-zoo3>=2.7.0",
+    "shimmy>=2.0.0",
+    "stable-baselines3>=2.7.1",
     "tqdm>=4.67.3",
+    "tyro>=1.0.8",
 ]
