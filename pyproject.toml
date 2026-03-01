@@ -5,7 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "gymnasium[accept-rom-license,atari,classic-control]>=1.2.3",
+    "ale-py>=0.11.2",
+    "gymnasium[accept-rom-license,atari,classic-control,other]>=1.2.3",
     "imageio>=2.37.2",
     "matplotlib>=3.10.8",
     "moviepy>=2.2.1",
