@@ -27,7 +27,7 @@ class Args:
     """the name of this experiment"""
     seed: int = 1
     """seed of the experiment"""
-    capture_video: bool = False 
+    capture_video: bool = True 
     """whether to capture video of the agent performance (adds rendering overhead)"""
     save_model: bool = True 
     """whether to save model into the `runs/{run_name}` folder"""
@@ -60,6 +60,13 @@ class Args:
     """timestep to start learning"""
     train_frequency: int = 4
     """the frequency of training"""
+
+    resume: bool = False
+    """whether to resume training from a checkpoint"""
+    checkpoint_path: str = ""
+    """path to checkpoint file to resume from"""
+    checkpoint_frequency: int = 100_000
+    """save checkpoint every N timesteps"""
 
 def make_env(env_id, seed, idx, capture_video, run_name, episode_trigger=None):
     def thunk():
@@ -145,9 +152,24 @@ if __name__ == "__main__":
         handle_timeout_termination=False,
     )
 
+    # --- Resume from checkpoint ---
+    start_step = 0
+    if args.resume and args.checkpoint_path:
+        checkpoint = torch.load(args.checkpoint_path, map_location=device, weights_only=False)
+        q_network.load_state_dict(checkpoint["q_network"])
+        target_network.load_state_dict(checkpoint["target_network"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        # Allow overriding LR on resume via --learning-rate
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = args.learning_rate
+        start_step = checkpoint["global_step"]
+        print(f"Resumed from checkpoint at step {start_step}, lr={args.learning_rate}")
+
+    checkpoint_dir = f"logs/breakout_with_dqn_runs/checkpoints"
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     obs, _ = envs.reset(seed=args.seed)
-    for global_step in range(args.total_timesteps):
+    for global_step in range(start_step, args.total_timesteps):
         epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
         if random.random() < epsilon:
             actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
@@ -165,7 +187,9 @@ if __name__ == "__main__":
 
         obs = next_obs
 
-        if global_step > args.learning_starts:
+        # buffer must have enough data to sample; on resume buffer refills from scratch
+        buffer_ready = rb.size() >= args.batch_size
+        if buffer_ready and global_step > args.learning_starts:
             if global_step % args.train_frequency == 0:
                 data = rb.sample(args.batch_size)
                 with torch.no_grad():
@@ -185,6 +209,18 @@ if __name__ == "__main__":
                     target_network_param.data.copy_(
                         args.tau * q_network_param.data + (1.0 - args.tau) * target_network_param.data
                     )
+
+        # --- Periodic checkpoint save ---
+        if global_step > 0 and global_step % args.checkpoint_frequency == 0:
+            ckpt_path = f"{checkpoint_dir}/{run_name}_step_{global_step}.pt"
+            torch.save({
+                "q_network": q_network.state_dict(),
+                "target_network": target_network.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "global_step": global_step,
+                "args": vars(args),
+            }, ckpt_path)
+            print(f"Checkpoint saved to {ckpt_path}")
 
     if args.save_model:
         model_path = f"logs/breakout_with_dqn_runs/{run_name}_{args.exp_name}.model"
