@@ -66,7 +66,13 @@ def get_obs_shape(
 
 
 def get_device(device: th.device | str = "auto") -> th.device:
-    return th.device("cpu")
+    if isinstance(device, th.device):
+        return device
+    if device == "auto":
+        if th.backends.mps.is_available():
+            return th.device("mps")
+        return th.device("cpu")
+    return th.device(device)
 
 
 class BaseBuffer(ABC):

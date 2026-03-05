@@ -106,7 +106,7 @@ class QNetwork(nn.Module):
         )
 
     def forward(self, x):
-        return self.network(x / 255.0)
+        return self.network(x.float() / 255.0)
 
 
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
@@ -132,9 +132,9 @@ if __name__ == "__main__":
         [make_env(args.env_id, args.seed + i, i, args.capture_video, run_name, episode_trigger=train_episode_trigger) for i in range(args.num_envs)]
     )
 
-    q_network = QNetwork(envs)
+    q_network = QNetwork(envs).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = QNetwork(envs)
+    target_network = QNetwork(envs).to(device)
     target_network.load_state_dict(q_network.state_dict())
     
     rb = ReplayBuffer(
