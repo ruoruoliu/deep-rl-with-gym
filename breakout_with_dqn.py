@@ -27,8 +27,8 @@ class Args:
     """the name of this experiment"""
     seed: int = 1
     """seed of the experiment"""
-    capture_video: bool = True 
-    """whether to capture video of the agent performance"""
+    capture_video: bool = False 
+    """whether to capture video of the agent performance (adds rendering overhead)"""
     save_model: bool = True 
     """whether to save model into the `runs/{run_name}` folder"""
 
@@ -40,13 +40,13 @@ class Args:
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
-    buffer_size: int = 1_000_000
-    """the replay memory buffer size"""
+    buffer_size: int = 100_000
+    """the replay memory buffer size (reduced for 16GB RAM; 1M needs ~53GB)"""
     gamma: float = 0.99
     """the discount factor gamma"""
     tau: float = 1.0
     """the target network update rate"""
-    target_network_frequency: int = 100
+    target_network_frequency: int = 1000
     """the timesteps it takes to update the target network"""
     batch_size: int = 32
     """the batch size of sample from the replay memory"""
@@ -124,10 +124,12 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     
-    device = torch.device("cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print(f"Using device: {device}")
     
+    train_episode_trigger = lambda x: x % 500 == 0  # record every 500 episodes during training
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.seed + i, i, args.capture_video, run_name) for i in range(args.num_envs)]
+        [make_env(args.env_id, args.seed + i, i, args.capture_video, run_name, episode_trigger=train_episode_trigger) for i in range(args.num_envs)]
     )
 
     q_network = QNetwork(envs)
